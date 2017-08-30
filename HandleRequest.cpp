@@ -245,6 +245,7 @@ void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap){
 	//保存最新的版本信息
 	remove("ClientVersion.txt");
 	rename("ServerVersion.txt" ,"ClientVersion.txt");
+	clientVersionMap = serverVersionMap;
 
 	return;
 }	
