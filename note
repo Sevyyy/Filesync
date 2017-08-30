@@ -1,0 +1,63 @@
+服务器维护一个列表文件，文件名加版本号
+客户端维护一个列表文件，文件名加版本号
+
+文件读取后放入map（怎么放？）
+
+服务器向客户端传文件=>传列表文件=>客户端判断：比较客户端列表和传过来的列表=>比客户端多的新增文件，都有的比较版本号，新的则覆盖，客户端多出来的，客户端删掉。（前两项要传，传完后记录修改时间，维护一个列表）
+
+客户端向服务器传文件=>先同步一次（新增的增加，版本号更新的覆盖，本地没有的删除，更新客户端修改时间列表）=>然后判断客户端文件修改时间（没修改过的不传，改过的版本号上升，传，客户端新增的，传，初始化版本号，传版本号列表）
+
+
+对一个本地文件，是否上传，判断如下，若修改时间没变，不传，变了，传，服务器版本号增加。若无上次修改时间则为新文件，传。
+
+
+对所有的，列表解析，处理服务器要删的，更新的同上
+
+本地列表有，服务器没的，删
+本地列表和服务器列表都没的为新增加的
+
+
+
+非上传前的同步：
+for each file on server:
+	if local exist
+		if version the same
+			pass
+		else
+			trans
+	else
+		trans
+
+for each file on local:
+	if server not exist
+		delete
+	else
+		pass
+
+
+上传前的同步：
+for each file on local:
+	if server exist:
+		if version less than server
+			trans
+		else
+			pass
+	else
+		if is new file:
+			pass
+		else
+			delete
+for each file on server:
+	if local not exist
+		trans
+	else
+		pass
+
+上传前更新版本：
+for each file on local:
+	if is new file
+		version = 1, trans
+	else if changed:
+		version++, trans
+	else
+		pass
