@@ -37,4 +37,7 @@ bool ConnectSocket(SOCKET &connectSocket);
 //关闭一个socket
 void CloseSocket(SOCKET &socket);
 
+//优雅地关闭一个socket
+void ShutdownSocket(SOCKET &socket);
+
 #endif

@@ -11,9 +11,6 @@
 
 using namespace std;
 
-#define REQUEST_NOTHING 20
-#define REQUEST_FILE 21
-
 #pragma comment (lib, "Ws2_32.lib")
 
 int main(){
@@ -39,7 +36,6 @@ int main(){
 		cout << "Server listen socket bind" << endl;
 	}
 
-
 	if(!Listen(serverSocket)){
 		return 0;
 	}else{
@@ -51,44 +47,40 @@ int main(){
 	string serverVersionMapFile = "ServerVersion.txt";
 	LoadVersionMap(serverVersionMap, serverVersionMapFile);
 
-	if(!AcceptClientConnection(serverSocket, clientSocket)){
-		return 0;
-	}else{
-		cout << "Accepted" << endl;
-	}
+	//recursively accept request and handle
+	while(1){
+		//accept
+		if(!AcceptClientConnection(serverSocket, clientSocket)){
+			cout << "Accept failed, press any key to continue" << endl;
+			cin.get();
+			cin.get();
+			continue;
+		}else{
+			cout << "Accepted" << endl;
+		}
 
-	ServerAutoSync(clientSocket);
+		int requestType;
+		requestType = RecvRequest(clientSocket);
 
-	SolveCommitFromClient(clientSocket, serverVersionMap);
-	SolveCommitFromClient(clientSocket, serverVersionMap);
+		switch(requestType){
+			case REQUEST_SYNC:{
+				ServerAutoSync(clientSocket);
+				break;
+			}
 
-	// while(1){
-	// 	if(!AcceptClientConnection(serverSocket, clientSocket)){
-	// 		break;
-	// 	}else{
-	// 		cout << "Accepted" << endl;
-	// 	}
+			case REQUSET_UPLOAD:{
+				SolveCommitFromClient(clientSocket, serverVersionMap);
+				break;
+			}
 
-	// 	cout << RecvRequest(clientSocket) << endl;
-	// 	shutdown(clientSocket, SD_BOTH);
-	// 	clientSocket = INVALID_SOCKET;
-	// }
+			default:{
+				break;
+			}
+		}
 
-
-
-
-	// char temp[20] = "HelloWorld";
-	// send(clientSocket, temp, 20, 0);
-	// printf("%s\n", temp);
-
-	// string file1 = "file1.txt";
-	// string file2 = "file2.txt";
-	// string file3 = "file3.txt";
-	// SendFile(clientSocket, file1);
-	// SendFile(clientSocket, file2);
-	// SendFile(clientSocket, file3);
-
-	// CloseSocket(clientSocket);
+		//close socket gracefully
+		ShutdownSocket(clientSocket);
+	}//end while
 
 	WSAEnd();
 	return 0;

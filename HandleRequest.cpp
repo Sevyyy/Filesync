@@ -148,6 +148,7 @@ void ServerAutoSync(SOCKET &remoteSocket){
 		SendFile(remoteSocket, fileName);
 	}
 
+	cout << "ServerAutoSync" << endl;
 	return;
 }
 
@@ -164,6 +165,8 @@ bool IsFile(string fileName){
 	if(fileName == "ServerVersion.txt")
 		return false;
 	if(fileName == "ClientVersion.txt")
+		return false;
+	if(fileName == "ClientFixTime.txt")
 		return false;
 	return true;
 }
@@ -230,6 +233,8 @@ void CompareServerWithClient(SOCKET &remoteSocket, map<string, int>& serverVersi
 
 ////同步请求中的客户端所进行的操作
 void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap){
+	//发送同步请求给服务器
+	SendRequset(remoteSocket, REQUEST_SYNC);
 	//获取服务器文件的版本信息，放入一个map中
 	RecvFile(remoteSocket);
 	map<string, int> serverVersionMap;
@@ -242,11 +247,13 @@ void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap){
 	//比较版本信息，从服务器请求所需文件
 	CompareServerWithClient(remoteSocket, serverVersionMap, clientVersionMap);
 
-	//保存最新的版本信息
+	//保存最新的版本和修改时间信息
 	remove("ClientVersion.txt");
 	rename("ServerVersion.txt" ,"ClientVersion.txt");
 	clientVersionMap = serverVersionMap;
+	UpdateFixTime(clientVersionMap);
 
+	cout << "Client synchronized!" << endl;
 	return;
 }	
 
@@ -275,10 +282,12 @@ void SolveCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
 			}
 		}
 	}
+
+	cout << "SolveCommitFromClient" << endl;
 }
 
 //更新修改时间的文件，用于客户端
-void SaveFixTime(map<string, int> &versionMap){
+void UpdateFixTime(map<string, int> &versionMap){
 	ofstream fout;
 	fout.open("ClientFixTime.txt");
 	map<string, int>::iterator it;
@@ -333,9 +342,14 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 	LoadVersionMap(version, "ClientVersion.txt");
 	LoadFixTimeMap(fixTime);
 
-	//获取文件修改时间
+	//判断文件是否存在并获取文件修改时间
 	struct _stat state;
-	_stat(fileName.c_str(), &state);
+	if(_stat(fileName.c_str(), &state) != 0){
+		cout << "File Not Exist" << endl;
+		return;
+	}
+
+	SendRequset(remoteSocket, REQUSET_UPLOAD);
 
 	//判断
 	if(fixTime.find(fileName) != fixTime.end()){          //如果不是新文件
@@ -348,7 +362,7 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 				SendFile(remoteSocket, fileName);
 				version[fileName]++;
 				UpdateVersionFile(version, "ClientVersion.txt");
-				SaveFixTime(version);
+				UpdateFixTime(version);
 			}else{
 				cout << "Need Sync first" << endl;
 			}
@@ -358,8 +372,10 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 		SendFile(remoteSocket, fileName);
 		version[fileName] = 1;
 		UpdateVersionFile(version, "ClientVersion.txt");
-		SaveFixTime(version);
+		UpdateFixTime(version);
 	}
+
+	cout << "Commit complited!" << endl;
 	
 	return;
 }

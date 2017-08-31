@@ -110,3 +110,9 @@ void CloseSocket(SOCKET &socket){
 	closesocket(socket);
 	socket = INVALID_SOCKET;
 }
+
+//优雅地关闭一个socket
+void ShutdownSocket(SOCKET &socket){
+	shutdown(socket, SD_BOTH);
+	socket = INVALID_SOCKET;
+}

@@ -84,7 +84,6 @@ bool IsFile(string fileName);
 //辅助函数，用于非上传前的同步操作中，删除服务器上没有但客户端有的文件
 void DeleteNotExist(map<string, int> &serverVersionMap);
 
-
 //辅助函数，判断服务器端和客户端文件的版本状态和是否存在，
 //并从服务器端请求文件，用于非上传前的同步
 void CompareServerWithClient(SOCKET &remoteSocket, map<string, int>& serverVersionMap, map<string, int>& clientVersionMap);
@@ -96,7 +95,7 @@ void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap);
 void SolveCommitFromClient(SOCKET &remoteSocket, map<string, int> &version);
 
 //更新修改时间的文件，用于客户端
-void SaveFixTime(map<string, int> &versionMap);
+void UpdateFixTime(map<string, int> &versionMap);
 
 //加载修改时间的文件，用于客户端
 void LoadFixTimeMap(map<string, int> &fixTime);

@@ -15,60 +15,129 @@ using namespace std;
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
 
+void PrintMenu(){
+	system("cls");
+	cout << "**********************" << endl;
+	cout << "*       A Name       *" << endl;
+	cout << "*                    *" << endl;
+	cout << "*  1. AutoSync       *" << endl;
+	cout << "*  2. Commit file    *" << endl;
+	cout << "*  3. Commit all     *" << endl;
+	cout << "*  0. quit           *" << endl;
+	cout << "*                    *" << endl;
+	cout << "**********************" << endl;
+	cout << "      Enter:___\b\b";
+	return;
+}
+
+void PressWait(){
+	cout << "Press any key to continue" << endl;
+	cin.get();
+	cin.get();
+	return;
+}
+
 int main(){
 	if(!WSAInitialize()){
 		return 0;
 	}
 
+	//socket for server
 	SOCKET serverSocket;
+
+	//version and fix time map
 	map<string, int> clientVersionMap;
+	map<string, int> clientFixTimeMap;
 	string clientVersionMapFile = "ClientVersion.txt";
 	LoadVersionMap(clientVersionMap, clientVersionMapFile);
 
+	//string clientFixTimeMapFile = "ClientFixTime.txt";
+	LoadFixTimeMap(clientFixTimeMap);
+
 	if(!CreateSocket(serverSocket)){
+		cout << "Creat socket failed, press any key to continue" << endl;
+		cin.get();
+		cin.get();
 		return 0;
+	}else{
+		cout << "Created socket" << endl;
 	}
+
+	//connect
 	if(!ConnectSocket(serverSocket)){
+		cout << "Connect failed, press any key to continue" << endl;
+		cin.get();
+		cin.get();
 		return 0;
 	}else{
 		cout << "Connected" << endl;
 	}
 
+	//auto sync when client start up
 	ClientAutoSync(serverSocket, clientVersionMap);
-	SaveFixTime(clientVersionMap);
+	cout << "Client auto synchronized, press any key to continue" << endl;
+	cin.get();
 
+	//CUI
+	while(1){
+		PrintMenu();
 
-	int temp;
-	cin >> temp;
+		int choice;
+		cin >> choice;
+		if(choice < 0 || choice > 3){    //invalid input
+			continue;
+		}else if(choice == 0){
+			cout << "Byebye" << endl;
+			break;
+		}
 
-	CommitFileToServer(serverSocket, "newfile.txt");
-	CommitFileToServer(serverSocket, "file2.txt");
+		cout << endl;
 
-	// int temp;
-	// while(cin >> temp){
-	// 	if(!Create(serverSocket)){
-	// 		return 0;
-	// 	}
-	// 	if(!Connect(serverSocket)){
-	// 		break;
-	// 	}else{
-	// 		cout << "Connected" << endl;
-	// 	}
+		//create
+		if(!CreateSocket(serverSocket)){
+			cout << "Creat socket failed, ";
+			PressWait();
+			continue;
+		}else{
+			cout << "Created socket" << endl;
+		}
 
-	// 	SendRequset(serverSocket, temp);
-	// 	shutdown(serverSocket, SD_BOTH);
-	// }
+		//connect
+		if(!ConnectSocket(serverSocket)){
+			cout << "Connect failed, ";
+			PressWait();
+			continue;
+		}else{
+			cout << "Connected" << endl;
+		}
 
-	// char temp[20];
-	// recv(serverSocket, temp, 20, 0);
-	// printf("%s\n", temp);
+		switch(choice){
+			case 1:{
+				ClientAutoSync(serverSocket, clientVersionMap);
+				PressWait();
+				break;
+			}
 
-	
-	// RecvFile(serverSocket);
-	// RecvFile(serverSocket);
-	// RecvFile(serverSocket);
+			case 2:{
+				string fileName;
+				cout << "Enter file name : ";
+				cin >> fileName;
+				CommitFileToServer(serverSocket, fileName);
+				PressWait();
+				break;
+			}
 
-	//CloseSocket(serverSocket);
+			case 3:{
+				
+				break;
+			}
+		}
+		
+		//close socket gracefully
+		ShutdownSocket(serverSocket);
+
+	}//end while
+
 	WSAEnd();
 
 	return 0;
