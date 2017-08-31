@@ -330,8 +330,8 @@ void SolveFileCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
 	RecvVersionItem(remoteSocket, versionItem);
 
 	//判断
-	if(versionItem.version > 0){           //如果版本大于0，即不为-1（未修改），则可能需要请求上传
-		if(versionItem.version == 1){      //新文件version为1
+	if(versionItem.version >= 0){           //如果版本大于0，即不为-1（未修改），则可能需要请求上传
+		if(versionItem.version == 0){      //新文件version为0
 			RecvFile(remoteSocket);
 			version[versionItem.name] = 1;
 			UpdateVersionFile(version, SERVER_VERSION_FILE);
@@ -379,7 +379,7 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 			version[fileName] = versionItem.version;
 		}
 	}else{ //新文件，直接上传
-		SendVersionItem(remoteSocket, fileName, 1);
+		SendVersionItem(remoteSocket, fileName, 0);
 		SendFile(remoteSocket, fileName);
 		version[fileName] = 1;
 	}
