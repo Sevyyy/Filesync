@@ -16,50 +16,6 @@ using namespace std;
 
 #pragma comment (lib, "Ws2_32.lib")
 
-struct VersionItem{
-	char name[28];
-	int version;
-	VersionItem(){}
-	VersionItem(const char *_name, int _version):version(_version){
-		copy(_name, _name+28, name);
-	}
-};
-
-void UpdateVersionFile(map<string, int> &version){
-	ofstream fout;
-	fout.open("ServerVersion.txt");
-	map<string, int>::iterator it;
-	for(it = version.begin(); it != version.end(); it++){
-		fout << it->first << " " << it->second << endl;
-	}
-	fout.close();
-	return;
-}
-
-void SolveCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
-	struct VersionItem versionItem;
-	char versionItemBuffer[sizeof(VersionItem)];
-	recv(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
-	memcpy(&versionItem, versionItemBuffer, sizeof(VersionItem));
-
-	if(versionItem.version > 0){
-		if(versionItem.version == 1){    //new file
-			RecvFile(remoteSocket);
-			version[versionItem.name] = 1;
-			UpdateVersionFile(version);
-		}else{
-			if(versionItem.version == version[versionItem.name]){
-				SendRequset(remoteSocket, REQUEST_FILE);
-				RecvFile(remoteSocket);
-				version[versionItem.name]++;
-				UpdateVersionFile(version);
-			}else{         //need not upload but sync
-				SendRequset(remoteSocket, REQUEST_NOTHING);
-			}
-		}
-	}
-}
-
 int main(){
 	if(!WSAInitialize()){
 		return 0;
@@ -104,7 +60,7 @@ int main(){
 	ServerAutoSync(clientSocket);
 
 	SolveCommitFromClient(clientSocket, serverVersionMap);
-
+	SolveCommitFromClient(clientSocket, serverVersionMap);
 
 	// while(1){
 	// 	if(!AcceptClientConnection(serverSocket, clientSocket)){

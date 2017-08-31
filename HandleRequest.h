@@ -15,6 +15,8 @@
 #include <map>
 #include <algorithm>
 #include <string>
+#include <fstream>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -22,9 +24,12 @@ using namespace std;
 #define DEFAULT_FILE_KEY "I AM A FILE"    //文件块标识
 #define DEFAULT_RQST_KEY "I AM A RQST"    //请求块标识
 
+//请求码
 #define REQUEST_SYNC 11                //同步请求
 #define REQUSET_UPLOAD 12			   //上传请求
 #define REQUEST_BAD 10                 //无效请求
+#define REQUEST_NOTHING 20             //不需要请求文件
+#define REQUEST_FILE 21			       //请求文件
 
 //文件块，用于文件传输文件之前的确认和属性传输
 struct FileBlock{
@@ -43,6 +48,15 @@ struct RequestBlock{
 	int type;
 	RequestBlock(){}
 	RequestBlock(int _type):key(DEFAULT_RQST_KEY), type(_type){}
+};
+
+struct VersionItem{
+	char name[28];
+	int version;
+	VersionItem(){}
+	VersionItem(const char *_name, int _version):version(_version){
+		copy(_name, _name+28, name);
+	}
 };
 
 
@@ -77,5 +91,25 @@ void CompareServerWithClient(SOCKET &remoteSocket, map<string, int>& serverVersi
 
 //同步请求中的客户端所进行的操作
 void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap);
+
+//处理客户端上传单个文件的请求，版本文件硬编码了
+void SolveCommitFromClient(SOCKET &remoteSocket, map<string, int> &version);
+
+//更新修改时间的文件，用于客户端
+void SaveFixTime(map<string, int> &versionMap);
+
+//加载修改时间的文件，用于客户端
+void LoadFixTimeMap(map<string, int> &fixTime);
+
+//发送版本信息（文件名加版本号）
+void SendVersionItem(SOCKET &remoteSocket, string fileName, int version);
+
+//更新版本文件
+void UpdateVersionFile(map<string, int> &version, string fileName);
+
+//客户端同步一个文件到服务器，存在硬编码
+void CommitFileToServer(SOCKET &remoteSocket, string fileName);
+
+
 
 #endif

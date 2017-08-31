@@ -249,3 +249,117 @@ void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap){
 
 	return;
 }	
+
+//处理客户端上传单个文件的请求，版本文件硬编码了
+void SolveCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
+	//接收versionItem
+	struct VersionItem versionItem;
+	char versionItemBuffer[sizeof(VersionItem)];
+	recv(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
+	memcpy(&versionItem, versionItemBuffer, sizeof(VersionItem));
+
+	//判断
+	if(versionItem.version > 0){           //如果版本大于0，即不为-1（未修改），则可能需要请求上传
+		if(versionItem.version == 1){      //新文件version为1
+			RecvFile(remoteSocket);
+			version[versionItem.name] = 1;
+			UpdateVersionFile(version, "ServerVersion.txt");
+		}else{                             //非新文件，判断版本是否是在最新版本上的改动
+			if(versionItem.version == version[versionItem.name]){     //是的话请求上传
+				SendRequset(remoteSocket, REQUEST_FILE);
+				RecvFile(remoteSocket);
+				version[versionItem.name]++;
+				UpdateVersionFile(version, "ServerVersion.txt");
+			}else{                       //不需要上传但并且提示客户端进行同步
+				SendRequset(remoteSocket, REQUEST_NOTHING);
+			}
+		}
+	}
+}
+
+//更新修改时间的文件，用于客户端
+void SaveFixTime(map<string, int> &versionMap){
+	ofstream fout;
+	fout.open("ClientFixTime.txt");
+	map<string, int>::iterator it;
+	struct _stat state;
+	for(it = versionMap.begin(); it != versionMap.end(); it++){
+		_stat(it->first.c_str(), &state);
+		fout << it->first << " " << state.st_mtime << endl;
+	}
+	fout.close();
+	return;
+}
+
+//加载修改时间的文件，用于客户端
+void LoadFixTimeMap(map<string, int> &fixTime){
+	ifstream fin;
+	fin.open("ClientFixTime.txt");
+	string name;
+	int time;
+	while(fin >> name){
+		fin >> time;
+		fixTime[name] = time;
+	}
+	fin.close();
+	return;
+}
+
+//发送版本信息（文件名加版本号）
+void SendVersionItem(SOCKET &remoteSocket, string fileName, int version){
+	struct VersionItem versionItem(fileName.c_str(), version);
+	char versionItemBuffer[sizeof(VersionItem)];
+	memcpy(versionItemBuffer, &versionItem, sizeof(VersionItem));
+	send(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
+}
+
+//更新版本文件
+void UpdateVersionFile(map<string, int> &version, string fileName){
+	ofstream fout;
+	fout.open(fileName.c_str());
+	map<string, int>::iterator it;
+	for(it = version.begin(); it != version.end(); it++){
+		fout << it->first << " " << it->second << endl;
+	}
+	fout.close();
+	return;
+}
+
+//客户端同步一个文件到服务器，存在硬编码
+void CommitFileToServer(SOCKET &remoteSocket, string fileName){
+	//加载修改时间和版本信息
+	map<string, int> fixTime;
+	map<string, int> version;
+	LoadVersionMap(version, "ClientVersion.txt");
+	LoadFixTimeMap(fixTime);
+
+	//获取文件修改时间
+	struct _stat state;
+	_stat(fileName.c_str(), &state);
+
+	//判断
+	if(fixTime.find(fileName) != fixTime.end()){          //如果不是新文件
+		if(fixTime[fileName] == state.st_mtime){         //未修改，不需要上传
+			SendVersionItem(remoteSocket, fileName, -1);
+			cout << "Never fix, do not need upload" << endl;
+		}else{    //修改过，需要上传
+			SendVersionItem(remoteSocket, fileName, version[fileName]);
+			if(RecvRequest(remoteSocket) == REQUEST_FILE){    //是基于最新版本修改的
+				SendFile(remoteSocket, fileName);
+				version[fileName]++;
+				UpdateVersionFile(version, "ClientVersion.txt");
+				SaveFixTime(version);
+			}else{
+				cout << "Need Sync first" << endl;
+			}
+		}
+	}else{ //新文件，直接上传
+		SendVersionItem(remoteSocket, fileName, 1);
+		SendFile(remoteSocket, fileName);
+		version[fileName] = 1;
+		UpdateVersionFile(version, "ClientVersion.txt");
+		SaveFixTime(version);
+	}
+	
+	return;
+}
