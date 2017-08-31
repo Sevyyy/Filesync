@@ -1,12 +1,7 @@
 #include <iostream>
 #include <string>
-#include <cstring>
-#include <stdio.h>
-#include <cstdio>
 #include <fstream>
-#include <algorithm>
-#include <sys/stat.h>
-#include <io.h>
+
 #include "Communication.h"
 #include "HandleRequest.h"
 
@@ -16,6 +11,7 @@ using namespace std;
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
 
+//客户端打印菜单
 void PrintMenu(){
 	system("cls");
 	cout << "**********************" << endl;
@@ -24,13 +20,14 @@ void PrintMenu(){
 	cout << "*  1. AutoSync       *" << endl;
 	cout << "*  2. Commit file    *" << endl;
 	cout << "*  3. Commit all     *" << endl;
-	cout << "*  0. quit           *" << endl;
+	cout << "*  0. Quit           *" << endl;
 	cout << "*                    *" << endl;
 	cout << "**********************" << endl;
 	cout << "      Enter : ";
 	return;
 }
 
+//辅助函数，进行press any key to continue 的逻辑
 void PressWait(){
 	cout << "Press any key to continue" << endl;
 	cin.get();
@@ -38,54 +35,76 @@ void PressWait(){
 	return;
 }
 
-int main(){
+//初始化客户端
+bool ClientInitialize(SOCKET &serverSocket){
+	//启动客户端
 	if(!WSAInitialize()){
-		return 0;
+		return false;
 	}
 
-	//socket for server
-	SOCKET serverSocket;
+	//如果客户端版本信息文件不存在，则创建一个
+	fstream fs;
+	fs.open(CLIENT_VERSION_FILE, ios::in);
+	if(!fs){
+		ofstream fout;
+		fout.open(CLIENT_VERSION_FILE);
+		fout.close();
+	}else{
+		fs.close();
+	}
 
+	//创建服务器套接字
 	if(!CreateSocket(serverSocket)){
-		cout << "Creat socket failed, press any key to continue" << endl;
-		cin.get();
-		cin.get();
-		return 0;
+		cout << "Creat socket failed, ";
+		PressWait();
+		return false;
 	}else{
 		cout << "Created socket" << endl;
 	}
 
-	//connect
+	//连接服务器
 	if(!ConnectSocket(serverSocket)){
-		cout << "Connect failed, press any key to continue" << endl;
-		cin.get();
-		cin.get();
-		return 0;
+		cout << "Connect failed, ";
+		PressWait();
+		return false;
 	}else{
 		cout << "Connected" << endl;
 	}
 
-	//auto sync when client start up
+	//连接后的自动同步
 	ClientAutoSync(serverSocket);
-	cout << "Client auto synchronized, press any key to continue" << endl;
-	cin.get();
+	cout << "Client auto synchronized, ";
+	PressWait();
 
-	//CUI
+	return true;
+}
+
+int main(){
+	//连接服务器的套接字
+	SOCKET serverSocket;
+
+	if(!ClientInitialize(serverSocket)){
+		cout << "Client initialize failed, ";
+		PressWait();
+		return 0;
+	}
+
+	//进入客户端的CUI
 	while(1){
+		//打印菜单
 		PrintMenu();
 
-		int choice;
+		//输入选择
+		int choice;	
 		cin >> choice;
-		if(choice < 0 || choice > 3){    //invalid input
+		if(choice < 0 || choice > 3){    //非法输入
 			continue;
-		}else if(choice == 0){
+		}else if(choice == 0){            //退出
 			cout << "Byebye" << endl;
 			break;
 		}
 
-		cout << endl;
-
-		//create
+		//创建套接字
 		if(!CreateSocket(serverSocket)){
 			cout << "Creat socket failed, ";
 			PressWait();
@@ -94,7 +113,7 @@ int main(){
 			cout << "Created socket" << endl;
 		}
 
-		//connect
+		//连接客户端
 		if(!ConnectSocket(serverSocket)){
 			cout << "Connect failed, ";
 			PressWait();
@@ -104,12 +123,14 @@ int main(){
 		}
 
 		switch(choice){
+			//同步服务器全局
 			case 1:{
 				ClientAutoSync(serverSocket);
 				PressWait();
 				break;
 			}
 
+			//上传一个文件
 			case 2:{
 				string fileName;
 				cout << "Enter file name : ";
@@ -119,6 +140,7 @@ int main(){
 				break;
 			}
 
+			//上传全局文件到服务器
 			case 3:{
 				CommitAllToServer(serverSocket);
 				PressWait();
@@ -126,10 +148,10 @@ int main(){
 			}
 		}
 		
-		//close socket gracefully
+		//优雅地关闭客户端套接字
 		ShutdownSocket(serverSocket);
 
-	}//end while
+	}//while 循环结束
 
 	WSAEnd();
 

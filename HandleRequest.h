@@ -21,6 +21,9 @@
 using namespace std;
 
 //宏定义
+#define SERVER_VERISON_FILE "ServerVersion.txt"       //服务器版本信息文件
+#define CLIENT_VERSION_FILE "ClientVersion.txt"       //客户端版本信息文件
+#define CLIENT_FIX_TIME_FILE "ClientFixTime.txt"      //客户端修改时间信息文件
 #define DEFAULT_FILE_KEY "I AM A FILE"    //文件块标识
 #define DEFAULT_RQST_KEY "I AM A RQST"    //请求块标识
 #define ENDCODE "END"
