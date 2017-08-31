@@ -11,6 +11,7 @@
 #include <ws2tcpip.h>
 
 //宏定义
+#define DEFAULT_IP "192.168.205.102"
 #define DEFAULT_PORT 2333                  //默认端口
 #define DEFAULT_BUFFER_SIZE 512            //默认缓冲块大小
 

@@ -91,7 +91,7 @@ bool ConnectSocket(SOCKET &connectSocket){
 	//socket地址信息
 	SOCKADDR_IN tempSockaddrIn;
 	tempSockaddrIn.sin_family = AF_INET;
-	tempSockaddrIn.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");   //本机测试用回调地址
+	tempSockaddrIn.sin_addr.S_un.S_addr = inet_addr(DEFAULT_IP);   //本机测试用回调地址
   	tempSockaddrIn.sin_port = htons(DEFAULT_PORT);
 
 	int connectResult = connect(connectSocket, (SOCKADDR*)&tempSockaddrIn, sizeof(SOCKADDR));

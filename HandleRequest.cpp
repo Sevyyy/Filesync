@@ -53,7 +53,7 @@ bool RecvFile(SOCKET &remoteSocket){
 	//接收FileBlock
 	struct FileBlock fileBlock;
 	char fileBlockBuffer[sizeof(FileBlock)];
-	recv(remoteSocket, fileBlockBuffer, sizeof(FileBlock), 0);
+	int temp = recv(remoteSocket, fileBlockBuffer, sizeof(FileBlock), 0);
 	memcpy(&fileBlock, fileBlockBuffer, sizeof(FileBlock));
 
 	//判断是否为文件并获取文件名和文件大小
@@ -77,17 +77,11 @@ bool RecvFile(SOCKET &remoteSocket){
 	//分块接收文件数据并写入文件
 	int recvCount;
 	char recvBuffer[DEFAULT_BUFFER_SIZE];
-	int T = fileLength/DEFAULT_BUFFER_SIZE + 1;
-	while(T--){
-		if(T != 0){    //没到尾
-			recvCount = recv(remoteSocket, recvBuffer, DEFAULT_BUFFER_SIZE, 0);
-		}else{         //最后一块，不满DEFAULT_BUFFER_SIZE
-			recvCount = recv(remoteSocket, recvBuffer, fileLength % DEFAULT_BUFFER_SIZE, 0);
-		}
-		if(recvCount == -1){
-			cout << "Error : " << WSAGetLastError() << endl;
-		}
+	int rest = fileLength;
+	while(rest > 0){
+		recvCount = recv(remoteSocket, recvBuffer, min(rest, DEFAULT_BUFFER_SIZE), 0);
 		fwrite(recvBuffer, 1, recvCount, p_file);
+		rest -= recvCount;
 	}
 
 	cout << "Receive done!" << endl;

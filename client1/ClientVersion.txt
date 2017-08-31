@@ -1,5 +1,4 @@
 anni.jpg 1
 file1.txt 2
-file2.txt 8
+file2.txt 2
 file3.txt 5
-file5.txt 1
