@@ -23,13 +23,17 @@ using namespace std;
 //宏定义
 #define DEFAULT_FILE_KEY "I AM A FILE"    //文件块标识
 #define DEFAULT_RQST_KEY "I AM A RQST"    //请求块标识
+#define ENDCODE "END"
 
 //请求码
 #define REQUEST_SYNC 11                //同步请求
-#define REQUSET_UPLOAD 12			   //上传请求
+#define REQUSET_UPLOAD 12			   //单上传请求
+#define REQUEST_COMMIT 13              //全局提交请求
 #define REQUEST_BAD 10                 //无效请求
+
 #define REQUEST_NOTHING 20             //不需要请求文件
 #define REQUEST_FILE 21			       //请求文件
+#define REQUEST_DELETE 22              //请求删除服务器文件
 
 //文件块，用于文件传输文件之前的确认和属性传输
 struct FileBlock{
@@ -82,17 +86,17 @@ void ServerAutoSync(SOCKET &remoteSocket);
 bool IsFile(string fileName);
 
 //辅助函数，用于非上传前的同步操作中，删除服务器上没有但客户端有的文件
-void DeleteNotExist(map<string, int> &serverVersionMap);
+void DeleteNotExistOnClient(map<string, int> &serverVersionMap);
 
 //辅助函数，判断服务器端和客户端文件的版本状态和是否存在，
 //并从服务器端请求文件，用于非上传前的同步
 void CompareServerWithClient(SOCKET &remoteSocket, map<string, int>& serverVersionMap, map<string, int>& clientVersionMap);
 
 //同步请求中的客户端所进行的操作
-void ClientAutoSync(SOCKET &remoteSocket, map<string, int>& clientVersionMap);
+void ClientAutoSync(SOCKET &remoteSocket);
 
 //处理客户端上传单个文件的请求，版本文件硬编码了
-void SolveCommitFromClient(SOCKET &remoteSocket, map<string, int> &version);
+void SolveFileCommitFromClient(SOCKET &remoteSocket, map<string, int> &version);
 
 //更新修改时间的文件，用于客户端
 void UpdateFixTime(map<string, int> &versionMap);
@@ -103,12 +107,26 @@ void LoadFixTimeMap(map<string, int> &fixTime);
 //发送版本信息（文件名加版本号）
 void SendVersionItem(SOCKET &remoteSocket, string fileName, int version);
 
+//接收版本信息
+void RecvVersionItem(SOCKET &remoteSocket, struct VersionItem &versionItem);
+
 //更新版本文件
 void UpdateVersionFile(map<string, int> &version, string fileName);
 
 //客户端同步一个文件到服务器，存在硬编码
 void CommitFileToServer(SOCKET &remoteSocket, string fileName);
 
+//服务器端用于处理客户端上传全局文件的请求
+void SolveAllCommitFromClient(SOCKET &remoteSocket, map<string, int> &version);
+
+//辅助函数，用于上传客户端全局时对比客户端和服务器文件状态
+void CompareClientWithServer(SOCKET &remoteSocket, map<string, int> &serverVersion, map<string, int> &clientVersion);
+
+//辅助函数，用于删除客户端删除了但服务器有的文件
+void DeleteNotExistOnServer(SOCKET &remoteSocket, map<string, int> serverVersion, map<string, int> &clientVersion);
+
+//用于客户端请求同步全局文件到服务器端
+void CommitAllToServer(SOCKET &remoteSocket);
 
 
 #endif
