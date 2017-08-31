@@ -1,6 +1,8 @@
 //包含头文件
-#include "Communication.h"
 #include "HandleRequest.h"
+
+#include <io.h>
+
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -8,8 +10,8 @@
 #include <fstream>
 #include <map>
 #include <algorithm>
-#include <io.h>
 
+#include "Communication.h"
 using namespace std;
 
 //向remote套接字发送一个文件，封装了错误处理，有FileBlock做校验，可用于服务器端和客户端
@@ -37,10 +39,8 @@ bool SendFile(SOCKET &remoteSocket, string fileName){
 	char sendBuffer[DEFAULT_BUFFER_SIZE];
 	while(!feof(p_file)){
 		sendCount = fread(sendBuffer, 1, DEFAULT_BUFFER_SIZE, p_file);
-		cout << "sendCount : " << sendCount << endl;
 		send(remoteSocket, sendBuffer, sendCount, 0);
 	}
-	cout << "File send successfully" << endl;
 
 	//关闭文件
 	fclose(p_file);
@@ -70,7 +70,7 @@ bool RecvFile(SOCKET &remoteSocket){
 	//打开要写的文件
 	FILE *p_file = fopen(fileName, "wb");
 	if(p_file == NULL){
-		cout << "create file failed : " << fileName << endl;
+		cout << "Create file failed : " << fileName << endl;
 		return false;
 	}
 
@@ -84,12 +84,37 @@ bool RecvFile(SOCKET &remoteSocket){
 		rest -= recvCount;
 	}
 
-	cout << "Receive done!" << endl;
-
 	//关闭文件
 	fclose(p_file);
 
 	return true;
+}
+
+//发送版本信息（文件名加版本号）
+void SendVersionItem(SOCKET &remoteSocket, string fileName, int version){
+	struct VersionItem versionItem(fileName.c_str(), version);
+	char versionItemBuffer[sizeof(VersionItem)];
+	memcpy(versionItemBuffer, &versionItem, sizeof(VersionItem));
+	send(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
+}
+
+//接收版本信息
+void RecvVersionItem(SOCKET &remoteSocket, struct VersionItem &versionItem){
+	char versionItemBuffer[sizeof(VersionItem)];
+	recv(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
+	memcpy(&versionItem, versionItemBuffer, sizeof(VersionItem));
+}
+
+//更新版本文件
+void UpdateVersionFile(map<string, int> &version, string fileName){
+	ofstream fout;
+	fout.open(fileName.c_str());
+	map<string, int>::iterator it;
+	for(it = version.begin(); it != version.end(); it++){
+		fout << it->first << " " << it->second << endl;
+	}
+	fout.close();
+	return;
 }
 
 //发送请求，一般用于客户端向服务器发送请求
@@ -128,17 +153,43 @@ void LoadVersionMap(map<string, int> &versionMap, string fileName){
 	return;
 }
 
+//更新修改时间的文件，用于客户端
+void UpdateFixTime(map<string, int> &versionMap){
+	ofstream fout;
+	fout.open(CLIENT_FIX_TIME_FILE);
+	map<string, int>::iterator it;
+	struct _stat state;
+	for(it = versionMap.begin(); it != versionMap.end(); it++){
+		_stat(it->first.c_str(), &state);
+		fout << it->first << " " << state.st_mtime << endl;
+	}
+	fout.close();
+	return;
+}
+
+//加载修改时间的文件，用于客户端
+void LoadFixTimeMap(map<string, int> &fixTime){
+	ifstream fin;
+	fin.open(CLIENT_FIX_TIME_FILE);
+	string name;
+	int time;
+	while(fin >> name){
+		fin >> time;
+		fixTime[name] = time;
+	}
+	fin.close();
+	return;
+}
+
 //同步请求中的服务器端提供的为客户端进行同步的操作
 void ServerAutoSync(SOCKET &remoteSocket){
 	//将服务器端的版本信息发送到客户端以检验
-	string versionFile = "ServerVersion.txt";
-	SendFile(remoteSocket, versionFile);
+	SendFile(remoteSocket, SERVER_VERSION_FILE);
 
 	//循环接受所请求的文件名并发送文件，当请求的大小为1时停止
 	//此处是用一个trick做循环停止的
 	char fileName[32];
 	while(recv(remoteSocket, fileName, 32, 0) != 1){
-		printf("%s\n", fileName);
 		SendFile(remoteSocket, fileName);
 	}
 
@@ -159,11 +210,11 @@ bool IsFile(string fileName){
 		return false;
 	if(fileName == "server.exe")
 		return false;
-	if(fileName == "ServerVersion.txt")
+	if(fileName == SERVER_VERSION_FILE)
 		return false;
-	if(fileName == "ClientVersion.txt")
+	if(fileName == CLIENT_VERSION_FILE)
 		return false;
-	if(fileName == "ClientFixTime.txt")
+	if(fileName == CLIENT_FIX_TIME_FILE)
 		return false;
 	return true;
 }
@@ -195,26 +246,38 @@ void DeleteNotExistOnClient(map<string, int> &serverVersionMap){
 }
 
 
-//辅助函数，判断服务器端和客户端文件的版本状态和是否存在，
-//并从服务器端请求文件，用于非上传前的同步
+//辅助函数，判断服务器端和客户端文件的版本状态和是否存在，并从服务器端请求文件，用于非上传前的同步
 void CompareServerWithClient(SOCKET &remoteSocket, map<string, int>& serverVersionMap, map<string, int>& clientVersionMap){
-	map<string, int>::iterator it_server;
+	//读取修改时间信息	
+	map<string, int> fixTime;
+	LoadFixTimeMap(fixTime);
+
+	map<string, int>::iterator it;
 	//对服务器的每一个文件
-	for(it_server = serverVersionMap.begin(); it_server != serverVersionMap.end(); it_server++){
+	for(it = serverVersionMap.begin(); it != serverVersionMap.end(); it++){
 		//如果在客户端存在
-		if(clientVersionMap.find(it_server->first) != clientVersionMap.end()){
+		if(clientVersionMap.find(it->first) != clientVersionMap.end()){
 			//如果客户端的该文件版本号比服务器的低（或不同），请求文件
-			if(it_server->second != clientVersionMap[it_server->first]){
+			if(it->second != clientVersionMap[it->first]){
 				char fileName[32];
-				strcpy(fileName, it_server->first.c_str());
-				printf("%s\n", fileName);
+				strcpy(fileName, it->first.c_str());
 				send(remoteSocket, fileName, 32 ,0);
 				RecvFile(remoteSocket);
+			}else{      //版本号一样
+				//获取修改时间
+				struct _stat state;
+				_stat(it->first.c_str(), &state);
+				//修改过，请求文件
+				if(fixTime[it->first] != state.st_mtime){
+					char fileName[32];
+					strcpy(fileName, it->first.c_str());
+					send(remoteSocket, fileName, 32 ,0);
+					RecvFile(remoteSocket);
+				}
 			}
 		}else{  //如果客户端不存在，像服务器请求
 			char fileName[32];
-			strcpy(fileName, it_server->first.c_str());
-			printf("Require %s\n", fileName);
+			strcpy(fileName, it->first.c_str());
 			send(remoteSocket, fileName, 32 ,0);
 			RecvFile(remoteSocket);
 		}
@@ -235,14 +298,14 @@ void CompareServerWithClient(SOCKET &remoteSocket, map<string, int>& serverVersi
 void ClientAutoSync(SOCKET &remoteSocket){
 	//读取客户端版本信息
 	map<string, int> clientVersion;
-	LoadVersionMap(clientVersion, "ClientVersion.txt");
+	LoadVersionMap(clientVersion, CLIENT_VERSION_FILE);
 
 	//发送同步请求给服务器
 	SendRequset(remoteSocket, REQUEST_SYNC);
 	//获取服务器文件的版本信息，放入一个map中
 	RecvFile(remoteSocket);
 	map<string, int> serverVersion;
-	LoadVersionMap(serverVersion, "ServerVersion.txt");
+	LoadVersionMap(serverVersion, SERVER_VERSION_FILE);
 	
 	//判断本地哪些文件需要删除
 	DeleteNotExistOnClient(serverVersion);
@@ -251,8 +314,8 @@ void ClientAutoSync(SOCKET &remoteSocket){
 	CompareServerWithClient(remoteSocket, serverVersion, clientVersion);
 
 	//保存最新的版本和修改时间信息
-	remove("ClientVersion.txt");
-	rename("ServerVersion.txt" ,"ClientVersion.txt");
+	remove(CLIENT_VERSION_FILE);
+	rename(SERVER_VERSION_FILE ,CLIENT_VERSION_FILE);
 	clientVersion = serverVersion;
 	UpdateFixTime(clientVersion);
 
@@ -271,79 +334,26 @@ void SolveFileCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
 		if(versionItem.version == 1){      //新文件version为1
 			RecvFile(remoteSocket);
 			version[versionItem.name] = 1;
-			UpdateVersionFile(version, "ServerVersion.txt");
+			UpdateVersionFile(version, SERVER_VERSION_FILE);
 		}else{                             //非新文件
 			RecvFile(remoteSocket);
 			version[versionItem.name]++;
 			//返回服务器版本号让客户端更新
 			SendVersionItem(remoteSocket, versionItem.name, version[versionItem.name]);
-			UpdateVersionFile(version, "ServerVersion.txt");
+			UpdateVersionFile(version, SERVER_VERSION_FILE);
 		}
 	}
 	cout << "SolveFileCommitFromClient" << endl;
 }
 
-//更新修改时间的文件，用于客户端
-void UpdateFixTime(map<string, int> &versionMap){
-	ofstream fout;
-	fout.open("ClientFixTime.txt");
-	map<string, int>::iterator it;
-	struct _stat state;
-	for(it = versionMap.begin(); it != versionMap.end(); it++){
-		_stat(it->first.c_str(), &state);
-		fout << it->first << " " << state.st_mtime << endl;
-	}
-	fout.close();
-	return;
-}
 
-//加载修改时间的文件，用于客户端
-void LoadFixTimeMap(map<string, int> &fixTime){
-	ifstream fin;
-	fin.open("ClientFixTime.txt");
-	string name;
-	int time;
-	while(fin >> name){
-		fin >> time;
-		fixTime[name] = time;
-	}
-	fin.close();
-	return;
-}
-
-//发送版本信息（文件名加版本号）
-void SendVersionItem(SOCKET &remoteSocket, string fileName, int version){
-	struct VersionItem versionItem(fileName.c_str(), version);
-	char versionItemBuffer[sizeof(VersionItem)];
-	memcpy(versionItemBuffer, &versionItem, sizeof(VersionItem));
-	send(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
-}
-
-//接收版本信息
-void RecvVersionItem(SOCKET &remoteSocket, struct VersionItem &versionItem){
-	char versionItemBuffer[sizeof(VersionItem)];
-	recv(remoteSocket, versionItemBuffer, sizeof(VersionItem), 0);
-	memcpy(&versionItem, versionItemBuffer, sizeof(VersionItem));
-}
-
-//更新版本文件
-void UpdateVersionFile(map<string, int> &version, string fileName){
-	ofstream fout;
-	fout.open(fileName.c_str());
-	map<string, int>::iterator it;
-	for(it = version.begin(); it != version.end(); it++){
-		fout << it->first << " " << it->second << endl;
-	}
-	fout.close();
-	return;
-}
 
 //客户端同步一个文件到服务器，存在硬编码
 void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 	//加载修改时间和版本信息
 	map<string, int> fixTime;
 	map<string, int> version;
-	LoadVersionMap(version, "ClientVersion.txt");
+	LoadVersionMap(version, CLIENT_VERSION_FILE);
 	LoadFixTimeMap(fixTime);
 
 	//判断文件是否存在并获取文件修改时间
@@ -359,7 +369,7 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 	if(fixTime.find(fileName) != fixTime.end()){          //如果不是新文件
 		if(fixTime[fileName] == state.st_mtime){         //未修改，不需要上传
 			SendVersionItem(remoteSocket, fileName, -1);
-			cout << "Never fix, do not need upload" << endl;
+			cout << "File never fixed, do not need uploading" << endl;
 		}else{    //修改过，需要上传
 			SendVersionItem(remoteSocket, fileName, version[fileName]);
 			SendFile(remoteSocket, fileName);
@@ -375,7 +385,7 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 	}
 
 	//更新版本和修改信息
-	UpdateVersionFile(version, "ClientVersion.txt");
+	UpdateVersionFile(version, CLIENT_VERSION_FILE);
 	UpdateFixTime(version);
 
 	cout << "Commit complited!" << endl;
@@ -386,7 +396,7 @@ void CommitFileToServer(SOCKET &remoteSocket, string fileName){
 //服务器端用于处理客户端上传全局文件的请求
 void SolveAllCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
 	//将服务器的版本信息发送给客户端供判断
-	SendFile(remoteSocket, "ServerVersion.txt");
+	SendFile(remoteSocket, SERVER_VERSION_FILE);
 
 	//对应CompareClientWithServer函数的响应
 	char fileName[32];
@@ -413,7 +423,7 @@ void SolveAllCommitFromClient(SOCKET &remoteSocket, map<string, int> &version){
 	}
 
 	//更新版本信息文件（递增的和被删的）
-	UpdateVersionFile(version, "ServerVersion.txt");
+	UpdateVersionFile(version, SERVER_VERSION_FILE);
 
 	cout << "SolveAllCommitFromClient" << endl;
 	return;
@@ -448,7 +458,7 @@ void CompareClientWithServer(SOCKET &remoteSocket, map<string, int> &serverVersi
         	//版本和服务器相当且未改过，不上传
         	if(clientVersion[fileInfo.name] == serverVersion[fileInfo.name]
         	&& clientFixTime[fileInfo.name] == state.st_mtime){
-        		//cout << "Need not to upload" << endl;
+        		//无操作
         	}else{    //否则上传
         		char fileName[32];
         		strcpy(fileName, fileInfo.name);
@@ -508,8 +518,8 @@ void CommitAllToServer(SOCKET &remoteSocket){
 	map<string, int> serverVersion;
 	map<string, int> clientVersion;
 	RecvFile(remoteSocket);
-	LoadVersionMap(serverVersion, "ServerVersion.txt");
-	LoadVersionMap(clientVersion, "ClientVersion.txt");
+	LoadVersionMap(serverVersion, SERVER_VERSION_FILE);
+	LoadVersionMap(clientVersion, CLIENT_VERSION_FILE);
 
 	//对比客户端和服务器文件状态
 	CompareClientWithServer(remoteSocket, serverVersion, clientVersion);
@@ -518,9 +528,9 @@ void CommitAllToServer(SOCKET &remoteSocket){
 	DeleteNotExistOnServer(remoteSocket, serverVersion, clientVersion);
 
 	//更新本地版本信息和修改时间信息
-    UpdateVersionFile(clientVersion, "ClientVersion.txt");
+    UpdateVersionFile(clientVersion, CLIENT_VERSION_FILE);
     UpdateFixTime(clientVersion);
 
-    remove("ServerVersion.txt");
+    remove(SERVER_VERSION_FILE);
 	return;
 }

@@ -23,6 +23,7 @@ void WSAEnd();
 
 //创建一个套接字，封装了错误处理，可用于服务器端和客户端
 bool CreateSocket(SOCKET & connectSocket);
+
 //绑定socket与地址端口，封装了错误处理，一般用于服务器端
 bool BindSocket(SOCKET & listenSocket);
 

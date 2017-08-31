@@ -1,5 +1,6 @@
 //包含头文件
 #include "Communication.h"
+
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -94,6 +95,7 @@ bool ConnectSocket(SOCKET &connectSocket){
 	tempSockaddrIn.sin_addr.S_un.S_addr = inet_addr(DEFAULT_IP);   //本机测试用回调地址
   	tempSockaddrIn.sin_port = htons(DEFAULT_PORT);
 
+  	//连接
 	int connectResult = connect(connectSocket, (SOCKADDR*)&tempSockaddrIn, sizeof(SOCKADDR));
 	if(connectResult == SOCKET_ERROR){
 		cout << "Client connect socket failed, ";

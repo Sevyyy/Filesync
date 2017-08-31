@@ -21,10 +21,10 @@ bool ServerInitialize(SOCKET &serverSocket){
 
 	//如果没有版本信息文件则新建一个
 	fstream fs;
-	fs.open(SERVER_VERISON_FILE, ios::in);
+	fs.open(SERVER_VERSION_FILE, ios::in);
 	if(!fs){
 		ofstream fout;
-		fout.open(SERVER_VERISON_FILE);
+		fout.open(SERVER_VERSION_FILE);
 		fout.close();
 	}else{
 		fs.close();
@@ -68,8 +68,7 @@ int main(){
 
 	//客户端在运行时，维护一个文件版本信息的map
 	map<string, int> serverVersionMap;
-	string serverVersionMapFile = "ServerVersion.txt";
-	LoadVersionMap(serverVersionMap, serverVersionMapFile);
+	LoadVersionMap(serverVersionMap, SERVER_VERSION_FILE);
 
 	//进入循环->接收连接->接受请求->处理请求->断开连接->进行下一次迭代
 	while(1){
