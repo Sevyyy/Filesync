@@ -1,5 +1,4 @@
 anni.jpg 1
 file1.txt 2
 file2.txt 2
-file3.txt 7
-socket±à³Ì1.ppt 1
+file3.txt 5
