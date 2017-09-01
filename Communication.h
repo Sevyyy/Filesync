@@ -9,6 +9,7 @@
 #include <WS2tcpip.h>
 #include <IPHlpApi.h>
 #include <ws2tcpip.h>
+#include <string> 
 
 //宏定义
 #define DEFAULT_IP "192.168.205.102"
@@ -34,7 +35,7 @@ bool Listen(SOCKET & listenSocket);
 bool AcceptClientConnection(SOCKET &listenSocket, SOCKET &connectSocket);
 
 //连接到远程socket，封装了错误处理，一般用于客户端连接服务器
-bool ConnectSocket(SOCKET &connectSocket);
+bool ConnectSocket(SOCKET &connectSocket, std::string ip = DEFAULT_IP);
 
 //关闭一个socket
 void CloseSocket(SOCKET &socket);

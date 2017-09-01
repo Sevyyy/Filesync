@@ -88,11 +88,11 @@ bool AcceptClientConnection(SOCKET &listenSocket, SOCKET &connectSocket){
 }
 
 //连接到远程socket，封装了错误处理，一般用于客户端连接服务器
-bool ConnectSocket(SOCKET &connectSocket){
+bool ConnectSocket(SOCKET &connectSocket, string ip /* = DEFAULT_IP*/){
 	//socket地址信息
 	SOCKADDR_IN tempSockaddrIn;
 	tempSockaddrIn.sin_family = AF_INET;
-	tempSockaddrIn.sin_addr.S_un.S_addr = inet_addr(DEFAULT_IP);   //本机测试用回调地址
+	tempSockaddrIn.sin_addr.S_un.S_addr = inet_addr(ip.c_str());   //本机测试用回调地址
   	tempSockaddrIn.sin_port = htons(DEFAULT_PORT);
 
   	//连接

@@ -37,6 +37,11 @@ void PressWait(){
 
 //初始化客户端
 bool ClientInitialize(SOCKET &serverSocket){
+	//设置服务器IP
+	string IP;
+	cout << "Enetr server ip : ";
+	cin >> IP;
+
 	//启动客户端
 	if(!WSAInitialize()){
 		return false;
@@ -63,7 +68,7 @@ bool ClientInitialize(SOCKET &serverSocket){
 	}
 
 	//连接服务器
-	if(!ConnectSocket(serverSocket)){
+	if(!ConnectSocket(serverSocket, IP)){
 		cout << "Connect failed, ";
 		PressWait();
 		return false;
